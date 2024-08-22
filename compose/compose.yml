@@ -1,0 +1,245 @@
+
+services:
+  frontend:
+    image: ghcr.io/rsr-by-aypa/frontend:latest
+    ports:
+      - "80:80"
+    networks:
+      - frontend-network
+      - frontend-auth-network
+    depends_on:
+      - api-gateway
+    container_name:
+      frontend
+
+  rabbitmq:
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    image: rabbitmq:3.13.3-management
+    networks:
+      - rabbit-network
+    container_name: 'rabbitmq'
+
+  postgres-for-product-microservice:
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=rsr
+      - POSTGRES_DB=ms-product
+    image: postgres:latest
+    volumes:
+      - postgres_product_data:/var/lib/postgresql/data
+    networks:
+      - product-network
+    container_name: 'postgres-for-product-microservice'
+
+  product-microservice:
+    image: ghcr.io/rsr-by-aypa/product-microservice:latest
+    ports:
+      - "8082:8080"
+    depends_on:
+      - postgres-for-product-microservice
+      - rabbitmq
+    networks:
+      - product-network
+      - rabbit-network
+    container_name: product-microservice
+
+  email-microservice:
+    image: ghcr.io/rsr-by-aypa/email-microservice:latest
+    ports:
+      - "8084:8080"
+    depends_on:
+      - rabbitmq
+      - postgres-for-email-microservice
+    networks:
+      - rabbit-network
+      - email-network
+    container_name: email-microservice
+
+  shopping-cart-microservice:
+    image: ghcr.io/rsr-by-aypa/rsr-shopping-cart-microservice:latest
+    ports:
+      - "8085:8080"
+    depends_on:
+      - rabbitmq
+      - postgres-for-shopping-cart-microservice
+    networks:
+      - rabbit-network
+      - shopping-cart-network
+    container_name: shopping-cart-microservice
+
+  order-microservice:
+    image: ghcr.io/rsr-by-aypa/rsr-order-microservice:latest
+    ports:
+      - "8086:8080"
+    depends_on:
+      - rabbitmq
+      - postgres-for-order-microservice
+    networks:
+      - order-network
+      - rabbit-network
+    container_name: order-microservice
+
+  payment-microservice:
+    image: ghcr.io/rsr-by-aypa/rsr-payment-microservice:latest
+    ports:
+      - "8087:8080"
+    depends_on:
+      - rabbitmq
+      - postgres-for-payment-microservice
+    networks:
+      - payment-network
+      - rabbit-network
+    container_name: payment-microservice
+
+  api-gateway:
+    image: ghcr.io/rsr-by-aypa/api-gateway:latest
+    ports:
+      - "8081:8080"
+    environment:
+      - SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_ISSUER_URI=http://keycloak:8080/auth/realms/RockSolidRemedies
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - api-network
+      - product-network
+      - frontend-network
+      - shopping-cart-network
+      - order-network
+      - payment-network
+    container_name: api-gateway
+
+  postgres-for-order-microservice:
+    ports:
+      - "5436:5432"
+    environment:
+      - POSTGRES_PASSWORD=S3cret
+      - POSTGRES_USER=rsr
+      - POSTGRES_DB=ms-order
+    image: postgres:latest
+    networks:
+      - order-network
+    volumes:
+      - postgres_order_data:/var/lib/postgresql/data
+    container_name: 'postgres-for-order-microservice'
+
+
+  postgres-for-shopping-cart-microservice:
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_PASSWORD=S3cret
+      - POSTGRES_USER=rsr
+      - POSTGRES_DB=ms-shopping-cart
+    image: postgres:latest
+    volumes:
+      - postgres_shopping_cart_data:/var/lib/postgresql/data
+    networks:
+      - shopping-cart-network
+    container_name: 'postgres-for-shopping-cart-microservice'
+
+  postgres-for-email-microservice:
+    ports:
+      - "5435:5432"
+    environment:
+      - POSTGRES_PASSWORD=S3cret
+      - POSTGRES_USER=rsr
+      - POSTGRES_DB=ms-email
+    image: postgres:latest
+    networks:
+      - email-network
+    container_name: 'postgres-for-email-microservice'
+
+  postgres-for-payment-microservice:
+    ports:
+      - "5437:5432"
+    environment:
+      - POSTGRES_PASSWORD=S3cret
+      - POSTGRES_USER=rsr
+      - POSTGRES_DB=ms-payment
+    image: postgres:latest
+    networks:
+      - payment-network
+    container_name: 'postgres-for-payment-microservice'
+
+  postgres-for-keycloak:
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_PASSWORD: S3cret
+      POSTGRES_USER: rsr_admin
+      POSTGRES_DB: keycloak_db
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres_keycloak_data:/var/lib/postgresql/data
+    image: postgres:latest
+    container_name: 'postgres-for-keycloak'
+    networks:
+      - keycloak-network
+
+  keycloak:
+    image: ghcr.io/rsr-by-aypa/rsr_keycloak:latest #quay.io/keycloak/keycloak:legacy
+    container_name: 'keycloak'
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      DB_VENDOR: POSTGRES
+      DB_ADDR: postgres-for-keycloak
+      DB_SCHEMA: public
+      DB_DATABASE: keycloak_db
+      DB_USER: rsr_admin
+      DB_PASSWORD: S3cret
+      KEYCLOAK_USER: rsr_admin
+      KEYCLOAK_PASSWORD: rsr_password
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres-for-keycloak
+    networks:
+      - api-network
+      - keycloak-network
+      - frontend-auth-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/auth/" ]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+
+networks:
+  product-network:
+    driver: bridge
+  rabbit-network:
+    driver: bridge
+  api-network:
+    driver: bridge
+  keycloak-network:
+    driver: bridge
+  frontend-network:
+    driver: bridge
+  frontend-auth-network:
+    driver: bridge
+  email-network:
+    driver: bridge
+  shopping-cart-network:
+    driver: bridge
+  order-network:
+    driver: bridge
+  payment-network:
+    driver: bridge
+
+
+volumes:
+  postgres_product_data:
+    driver: local
+  postgres_keycloak_data:
+    driver: local
+  keycloak_data:
+    driver: local
+  postgres_shopping_cart_data:
+    driver: local
+  postgres_order_data:
+    driver: local

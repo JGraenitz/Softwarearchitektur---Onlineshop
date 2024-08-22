@@ -1,0 +1,76 @@
+
+management:
+  endpoint:
+    gateway:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: gateway
+
+
+spring:
+  main:
+    web-application-type: reactive
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak:
+            client-id: rsr-api-gateway
+            client-secret: gs9VfLEeM268VHLrxP0woZ46OzaHnTW6
+            authorization-grant-type: client_credentials
+            scope: openid
+        provider:
+          keycloak:
+            login-uri: http://keycloak:8080/auth/realms/RockSolidRemedies/protocol/openid-connect/auth
+            issuer-uri: http://keycloak:8080/auth/realms/RockSolidRemedies
+            jwk-uri: http://keycloak:8080/auth/realms/RockSolidRemedies/protocol/openid-connect/certs
+
+  cloud:
+    gateway:
+      routes:
+        - id: client_admin_route_product
+          uri: http://product-microservice:8080
+          predicates:
+            - Path=/admin/product/**
+          metadata:
+            roles: client_admin_product
+        - id: client_user_route
+          uri: http://product-microservice:8080
+          predicates:
+            - Path=/product/**
+          metadata:
+            roles: client_user
+        - id: shopping_cart_route
+          uri: http://shopping-cart-microservice:8080
+          predicates:
+            - Path=/shopping-cart/**
+          filters:
+            - name: UserIdFilter
+        - id: order_route
+          uri: http://order-microservice:8080
+          predicates:
+            - Path=/orders/**
+          filters:
+            - name: UserIdFilter
+        - id: payment_route
+          uri: http://payment-microservice:8080
+          predicates:
+            - Path=/payment/**
+          filters:
+            - name: UserIdFilter
+            - name: AddResponseHeader
+              args:
+                name: Access-Control-Allow-Methods
+                value: "GET, POST, PUT, DELETE, OPTIONS"
+            - name: AddResponseHeader
+              args:
+                name: Access-Control-Allow-Headers
+                value: "Content-Type, Authorization"
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    reactor.netty.http.client: DEBUG
+

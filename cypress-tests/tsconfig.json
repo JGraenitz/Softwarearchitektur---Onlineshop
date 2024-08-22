@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "target": "es5",
+    "lib": ["es2023", "dom"],
+    "types": ["cypress", "node"],
+    "esModuleInterop": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@fixtures/*": ["./cypress/fixtures/*"],
+      "@models/*": ["./cypress/models/*"],
+      "@integration/*": ["./cypress/integration/*"],
+      "@support/*": ["./cypress/support/*"],
+    }
+  },
+  "include": [
+    "**/*.ts"
+  ],
+}
